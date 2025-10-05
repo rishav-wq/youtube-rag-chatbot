@@ -1,9 +1,34 @@
+# Core Streamlit
 streamlit
+
+# LangChain Core
 langchain
+langchain-core
+langchain-community
+
+# LangChain Integrations
+langchain-groq
 langchain-openai
-langchain_community
-youtube-transcript-api
+langchain-huggingface
+
+# Vector Store
 faiss-cpu
+
+# YouTube & Web
+youtube-transcript-api
+yt-dlp
 google-search-results
-python-dotenv
+
+# Embeddings & NLP
+sentence-transformers
+transformers
+torch
 nltk
+
+# Utilities
+python-dotenv
+
+# Optional but recommended
+tiktoken
+requests
+urllib3
