@@ -1,0 +1,72 @@
+{
+  "summary": {
+    "total_sources": 6,
+    "used_sources": 6,
+    "sources_by_type": {
+      "transcript": 1,
+      "background": 2,
+      "discussions": 1,
+      "academic": 1,
+      "current": 1
+    },
+    "sources": [
+      {
+        "source_type": "transcript",
+        "content_preview": "Welcome to this weekend's trivia quiz. Today's quiz has 10 rounds of five questions each. You'll have 10 seconds to answer each question or pause if you want more time. Coming up, what's up? Where in ...",
+        "relevance_score": 1.0,
+        "used_in_context": true,
+        "timestamp": "2025-10-05T03:32:27.537058"
+      },
+      {
+        "source_type": "background",
+        "content_preview": "The Apostle Andrew was one of the twelve main disciples of Jesus Christ and the brother of Simon Peter. Andrew was the first apostle Jesus ... Andrew was a disciple of Jesus Christ and was called from...",
+        "relevance_score": 0.8,
+        "used_in_context": true,
+        "timestamp": "2025-10-05T03:32:39.134994"
+      },
+      {
+        "source_type": "background",
+        "content_preview": "A scenario consists of a series of rounds that are played until players either meet the victory conditions of the scenario or fail the scenario. Once a round has been completed and confirmed, you will...",
+        "relevance_score": 0.8,
+        "used_in_context": true,
+        "timestamp": "2025-10-05T03:32:40.816437"
+      },
+      {
+        "source_type": "discussions",
+        "content_preview": "No good Google Search Result was found",
+        "relevance_score": 0.8,
+        "used_in_context": true,
+        "timestamp": "2025-10-05T03:32:42.810803"
+      },
+      {
+        "source_type": "academic",
+        "content_preview": "Stanford University - \u202a\u202aCited by 296490\u202c\u202c - \u202aMachine Learning\u202c - \u202aDeep Learning\u202c - \u202aAI\u202c Andrew's 3 research works with 108 citations, including: Decentralization of the Firm: Theory and Evidence. by T...",
+        "relevance_score": 0.8,
+        "used_in_context": true,
+        "timestamp": "2025-10-05T03:32:44.482588"
+      },
+      {
+        "source_type": "current",
+        "content_preview": "Billionaire Elon Musk and Prince Andrew are named in new files released by Congressional Democrats that relate to the late convicted sex ... \"Prince William supports a clean break and has reportedly c...",
+        "relevance_score": 0.8,
+        "used_in_context": true,
+        "timestamp": "2025-10-05T03:32:46.200572"
+      }
+    ]
+  },
+  "query_history": [
+    {
+      "timestamp": "2025-10-05T03:34:16.335853",
+      "question": "is a movie featuring leonardo di capario and jennifer lawrence about a comet heading on earth",
+      "answer_preview": "According to the transcript, the answer is: \"Don't Look Up\". This is a 2021 film starring Jennifer Lawrence and Leonardo DiCaprio about a comet heading for Earth.",
+      "sources_used": [
+        "transcript",
+        "background",
+        "discussions",
+        "academic",
+        "current"
+      ]
+    }
+  ],
+  "generated_at": "2025-10-05T03:34:38.163106"
+}

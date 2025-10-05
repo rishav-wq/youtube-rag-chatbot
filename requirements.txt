@@ -1,0 +1,9 @@
+streamlit
+langchain
+langchain-openai
+langchain_community
+youtube-transcript-api
+faiss-cpu
+google-search-results
+python-dotenv
+nltk
