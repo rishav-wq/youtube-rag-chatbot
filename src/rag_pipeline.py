@@ -332,12 +332,10 @@ class ContentEnricher:
 
 # ==================== DOCUMENT LOADING ====================
 
-def load_and_enrich_documents(url: str, 
-                              config: Optional[EnrichmentConfig] = None,
+def load_and_enrich_documents(url: str, config: Optional[EnrichmentConfig] = None, 
                               source_tracker: Optional[SourceTracker] = None) -> Tuple[List[str], Dict, SourceTracker]:
     """
     Load transcript and enrich with configured strategies
-    
     Returns:
         - documents: List of enriched content
         - metadata: Video and enrichment metadata
@@ -354,27 +352,75 @@ def load_and_enrich_documents(url: str,
         print(f"Extracted video ID: {video_id}")
         
         api = YouTubeTranscriptApi()
+        transcript_obj = None
+        full_transcript = None
         
+        # Try to fetch transcript with multiple fallback strategies
         try:
-            print("Fetching transcript...")
+            # Strategy 1: Try English transcript
+            print("Attempting to fetch English transcript...")
             transcript_obj = api.fetch(video_id, languages=['en'])
-            print(f"✓ Fetched transcript")
+            full_transcript = extract_text_from_transcript(transcript_obj)
+            print(f"✓ Successfully fetched English transcript")
+            
         except Exception as e1:
-            print(f"English fetch failed, trying default...")
+            print(f"English transcript not available: {e1}")
+            
             try:
+                # Strategy 2: Try fetching any available transcript
+                print("Attempting to fetch any available transcript...")
                 transcript_obj = api.fetch(video_id)
+                full_transcript = extract_text_from_transcript(transcript_obj)
+                print(f"✓ Successfully fetched default transcript")
+                
             except Exception as e2:
-                print(f"Default fetch failed, trying list...")
-                transcript_list = api.list(video_id)
-                if transcript_list and len(transcript_list) > 0:
-                    transcript_obj = transcript_list[0]
-                else:
-                    raise Exception(f"No transcripts found: {e1}, {e2}")
+                print(f"Default transcript fetch failed: {e2}")
+                
+                try:
+                    # Strategy 3: List all available transcripts and get the first one
+                    print("Attempting to list and fetch first available transcript...")
+                    transcript_list = api.list(video_id)
+                    
+                    # TranscriptList is iterable but doesn't have len()
+                    # Try to get the first available transcript
+                    available_transcripts = list(transcript_list)
+                    
+                    if not available_transcripts:
+                        raise Exception("No transcripts available for this video")
+                    
+                    # Try to find English or auto-generated transcript first
+                    preferred_transcript = None
+                    for transcript in available_transcripts:
+                        if hasattr(transcript, 'language_code'):
+                            if transcript.language_code in ['en', 'en-US', 'en-GB']:
+                                preferred_transcript = transcript
+                                break
+                    
+                    # If no English found, use first available
+                    if preferred_transcript is None:
+                        preferred_transcript = available_transcripts[0]
+                    
+                    # Fetch the selected transcript
+                    transcript_obj = preferred_transcript.fetch()
+                    full_transcript = extract_text_from_transcript(transcript_obj)
+                    
+                    language = getattr(preferred_transcript, 'language_code', 'unknown')
+                    print(f"✓ Successfully fetched transcript in language: {language}")
+                    
+                except Exception as e3:
+                    error_msg = (
+                        f"Failed to fetch transcript for video {video_id}. "
+                        f"Errors encountered:\n"
+                        f"1. English transcript: {str(e1)}\n"
+                        f"2. Default transcript: {str(e2)}\n"
+                        f"3. List transcripts: {str(e3)}\n"
+                        f"The video may not have any transcripts available."
+                    )
+                    raise Exception(error_msg)
         
-        full_transcript = extract_text_from_transcript(transcript_obj)
-        
+        # Validate transcript content
         if not full_transcript or not full_transcript.strip():
-            raise Exception("Transcript is empty")
+            raise Exception("Transcript was fetched but contains no text content")
         
         print(f"Successfully extracted transcript ({len(full_transcript)} characters)")
         
@@ -397,7 +443,7 @@ def load_and_enrich_documents(url: str,
         # Start with transcript
         content_parts = [f"=== VIDEO TRANSCRIPT ===\n{full_transcript}"]
         
-        # Apply enrichment
+        # Apply enrichment if configured
         if config.enabled:
             enricher = ContentEnricher(config, source_tracker)
             enriched_data = enricher.enrich(video_title, full_transcript)
@@ -416,8 +462,7 @@ def load_and_enrich_documents(url: str,
         return [enriched_content], metadata, source_tracker
         
     except Exception as e:
-        raise Exception(f"Failed to load transcript: {str(e)}")
-
+        raise Exception(f"Failed to load and process video: {str(e)}")
 # ==================== VECTOR STORE ====================
 
 def create_vector_store(documents: list):
