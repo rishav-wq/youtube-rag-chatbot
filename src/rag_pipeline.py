@@ -510,6 +510,7 @@ class TrackedRAGChain:
         self.vector_store = vector_store
         self.metadata = metadata
         self.tracker = source_tracker
+        self.llm = None  # Store LLM instance
         self.chain = self._create_chain()
     
     def _create_chain(self):
@@ -542,6 +543,9 @@ class TrackedRAGChain:
         
         if not llm:
             raise Exception("No Groq models available")
+        
+        # Store LLM instance for later use
+        self.llm = llm
         
         retriever = self.vector_store.as_retriever(
             search_type="similarity",
@@ -580,7 +584,7 @@ ANSWER:"""
         return (
             {"context": retriever, "question": RunnablePassthrough()}
             | prompt
-            | llm
+            | self.llm
             | StrOutputParser()
         )
     
@@ -607,6 +611,158 @@ ANSWER:"""
             'sources_summary': self.tracker.get_summary(),
             'metadata': self.metadata
         }
+    
+    def generate_auto_qa(self, num_questions: int = 5) -> List[Dict[str, str]]:
+        """
+        Automatically generate relevant questions and answers about the video
+        
+        Args:
+            num_questions: Number of questions to generate
+            
+        Returns:
+            List of dicts with 'question' and 'answer' keys
+        """
+        print(f"\n🤖 Generating {num_questions} questions about the video...")
+        
+        # Get video title for context
+        video_title = self.metadata.get('title', 'this video')
+        
+        # Prompt to generate questions
+        question_gen_prompt = f"""Based on the video titled "{video_title}", generate {num_questions} insightful questions that viewers would want to know.
+
+Make the questions:
+- Specific to the video content
+- Diverse (covering main topics, key points, examples, conclusions)
+- Natural and conversational
+
+Return ONLY the questions, one per line, numbered 1-{num_questions}."""
+
+        try:
+            # Generate questions
+            questions_text = self.llm.invoke(question_gen_prompt).content
+            questions = []
+            
+            # Parse questions
+            for line in questions_text.strip().split('\n'):
+                line = line.strip()
+                # Remove numbering (1., 2., etc.)
+                if line and (line[0].isdigit() or line.startswith('-') or line.startswith('•')):
+                    question = re.sub(r'^\d+[\.\)]\s*', '', line)
+                    question = re.sub(r'^[-•]\s*', '', question)
+                    if question:
+                        questions.append(question.strip())
+            
+            # Limit to requested number
+            questions = questions[:num_questions]
+            
+            # Generate answers for each question
+            qa_pairs = []
+            for i, question in enumerate(questions, 1):
+                print(f"  Answering question {i}/{len(questions)}...")
+                answer = self.invoke(question)
+                qa_pairs.append({
+                    'question': question,
+                    'answer': answer
+                })
+            
+            print(f"✓ Generated {len(qa_pairs)} Q&A pairs\n")
+            return qa_pairs
+            
+        except Exception as e:
+            print(f"Error generating Q&A: {e}")
+            return []
+    
+    def generate_summary(self, summary_type: str = "comprehensive") -> Dict[str, str]:
+        """
+        Generate different types of summaries for the video
+        
+        Args:
+            summary_type: Type of summary - 'brief', 'detailed', 'comprehensive', 'bullet_points'
+            
+        Returns:
+            Dict with summary content and metadata
+        """
+        print(f"\n📝 Generating {summary_type} summary...")
+        
+        video_title = self.metadata.get('title', 'this video')
+        
+        prompts = {
+            'brief': f"""Provide a brief 2-3 sentence summary of the video titled "{video_title}".
+Focus on the main topic and key takeaway.""",
+            
+            'detailed': f"""Provide a detailed summary of the video titled "{video_title}".
+Include:
+- Main topic and context
+- Key points discussed (3-5 points)
+- Important examples or demonstrations
+- Main conclusions or recommendations
+
+Write in clear paragraphs.""",
+            
+            'comprehensive': f"""Provide a comprehensive summary of the video titled "{video_title}".
+Include:
+1. Overview: What is this video about?
+2. Main Topics: What are the key subjects covered?
+3. Key Insights: What are the important takeaways?
+4. Examples/Evidence: What specific examples or data are mentioned?
+5. Conclusions: What does the video conclude or recommend?
+
+Be thorough and well-organized.""",
+            
+            'bullet_points': f"""Summarize the video titled "{video_title}" in bullet points.
+
+Format:
+• Main Topic: [topic]
+• Key Points:
+  - Point 1
+  - Point 2
+  - Point 3
+• Important Details:
+  - Detail 1
+  - Detail 2
+• Conclusion: [conclusion]
+
+Be concise and actionable.""",
+            
+            'tldr': f"""Create a TL;DR (Too Long; Didn't Read) summary of the video titled "{video_title}".
+
+Keep it to 1-2 sentences maximum. Make it catchy and informative."""
+        }
+        
+        try:
+            prompt = prompts.get(summary_type, prompts['comprehensive'])
+            summary = self.invoke(prompt)
+            
+            print(f"✓ {summary_type.title()} summary generated\n")
+            
+            return {
+                'type': summary_type,
+                'summary': summary,
+                'video_title': video_title,
+                'generated_at': datetime.now().isoformat()
+            }
+            
+        except Exception as e:
+            print(f"Error generating summary: {e}")
+            return {
+                'type': summary_type,
+                'summary': f"Error generating summary: {str(e)}",
+                'video_title': video_title,
+                'generated_at': datetime.now().isoformat()
+            }
+    
+    def generate_all_summaries(self) -> Dict[str, Dict]:
+        """Generate all types of summaries"""
+        print("\n📚 Generating all summary types...")
+        
+        summaries = {}
+        summary_types = ['tldr', 'brief', 'bullet_points', 'detailed', 'comprehensive']
+        
+        for stype in summary_types:
+            summaries[stype] = self.generate_summary(stype)
+        
+        print(f"✓ Generated {len(summaries)} different summaries\n")
+        return summaries
 
 # ==================== HELPER FUNCTIONS ====================
 

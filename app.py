@@ -47,6 +47,8 @@ def main():
         st.session_state.tracker = None
         st.session_state.metadata = None
         st.session_state.chat_history = []
+        st.session_state.auto_qa = []
+        st.session_state.summaries = {}
     
     # Sidebar for configuration
     with st.sidebar:
@@ -151,6 +153,8 @@ def main():
             st.session_state.tracker = None
             st.session_state.metadata = None
             st.session_state.chat_history = []
+            st.session_state.auto_qa = []
+            st.session_state.summaries = {}
             st.rerun()
     
     # Process video
@@ -225,6 +229,8 @@ def main():
                     with st.expander("📋 View Source Details"):
                         st.json(tracker.get_summary()['sources_by_type'])
                 
+                st.success("✅ System ready! Use the sections below to generate summaries or ask questions.")
+                
             except Exception as e:
                 progress_bar.empty()
                 status_text.empty()
@@ -232,6 +238,132 @@ def main():
                 with st.expander("🔍 Show details"):
                     import traceback
                     st.code(traceback.format_exc())
+    
+    # Video Summaries Section (persistent, outside process_button block)
+    if st.session_state.rag_chain:
+        st.markdown("---")
+        st.subheader("📝 Video Summaries")
+        
+        # Summary type selector
+        summary_col1, summary_col2 = st.columns([3, 1])
+        with summary_col1:
+            summary_type = st.selectbox(
+                "Choose summary type:",
+                ["TL;DR (1-2 sentences)", "Brief (2-3 sentences)", 
+                 "Bullet Points", "Detailed", "Comprehensive"],
+                key="summary_type"
+            )
+        with summary_col2:
+            st.write("")
+            st.write("")
+            generate_summary_btn = st.button("📝 Generate", key="gen_summary")
+        
+        # Map display names to internal types
+        summary_type_map = {
+            "TL;DR (1-2 sentences)": "tldr",
+            "Brief (2-3 sentences)": "brief",
+            "Bullet Points": "bullet_points",
+            "Detailed": "detailed",
+            "Comprehensive": "comprehensive"
+        }
+        
+        # Generate summary on button click
+        if generate_summary_btn:
+            selected_type = summary_type_map[summary_type]
+            with st.spinner(f"Generating {summary_type} summary..."):
+                try:
+                    summary = st.session_state.rag_chain.generate_summary(selected_type)
+                    st.session_state.summaries[selected_type] = summary
+                    st.success(f"✅ {summary_type} summary generated!")
+                    st.rerun()
+                except Exception as e:
+                    error_msg = str(e)
+                    if "rate_limit" in error_msg.lower() or "429" in error_msg:
+                        # Extract wait time if available
+                        import re
+                        wait_match = re.search(r'try again in ([\d\.]+[msh]+)', error_msg)
+                        wait_time = wait_match.group(1) if wait_match else "a few minutes"
+                        
+                        st.error(f"⚠️ **Groq API Rate Limit Reached**")
+                        st.warning(f"""
+                        You've used up your daily token limit (100,000 tokens/day).
+                        
+                        **Wait time:** ~{wait_time}
+                        
+                        **Options:**
+                        - ⏰ Wait for the limit to reset
+                        - 💰 Upgrade at [Groq Console](https://console.groq.com/settings/billing)
+                        - 💬 Continue using the chat (uses fewer tokens)
+                        """)
+                    else:
+                        st.error(f"❌ Error: {error_msg}")
+        
+        # Display generated summaries
+        if st.session_state.summaries:
+            st.markdown("### Generated Summaries:")
+            for stype, summary_data in st.session_state.summaries.items():
+                type_display = {
+                    'tldr': '⚡ TL;DR',
+                    'brief': '📄 Brief',
+                    'bullet_points': '📌 Bullet Points',
+                    'detailed': '📖 Detailed',
+                    'comprehensive': '📚 Comprehensive'
+                }
+                
+                with st.expander(f"{type_display.get(stype, stype.title())} Summary", expanded=True):
+                    st.markdown(summary_data['summary'])
+                    st.caption(f"Generated at: {summary_data['generated_at']}")
+        
+        # Option to generate all summaries at once
+        if st.button("📚 Generate All Summary Types", key="gen_all_summaries"):
+            with st.spinner("Generating all summary types... This may take a minute."):
+                try:
+                    all_summaries = st.session_state.rag_chain.generate_all_summaries()
+                    st.session_state.summaries = all_summaries
+                    st.success("✅ All summaries generated!")
+                    st.rerun()
+                except Exception as e:
+                    error_msg = str(e)
+                    if "rate_limit" in error_msg.lower() or "429" in error_msg:
+                        st.error("⚠️ Rate limit reached! Please wait a few minutes and try again.")
+                        st.info("💡 Tip: Generate one summary at a time to conserve tokens.")
+                    else:
+                        st.error(f"❌ Error: {error_msg}")
+        
+        # Auto Q&A Section (Optional)
+        st.markdown("---")
+        st.subheader("🤖 Auto-Generated Q&A")
+        st.caption("⚠️ Note: This feature uses significant API tokens. Use sparingly if near rate limits.")
+        
+        qa_col1, qa_col2 = st.columns([3, 1])
+        with qa_col1:
+            num_questions = st.slider("Number of questions:", 1, 10, 5, key="num_qa")
+        with qa_col2:
+            st.write("")
+            st.write("")
+            generate_qa_btn = st.button("🤖 Generate Q&A", key="gen_qa")
+        
+        # Generate Q&A on button click
+        if generate_qa_btn:
+            with st.spinner(f"Generating {num_questions} questions and answers..."):
+                try:
+                    auto_qa = st.session_state.rag_chain.generate_auto_qa(num_questions=num_questions)
+                    st.session_state.auto_qa = auto_qa
+                    st.rerun()
+                except Exception as e:
+                    if "rate_limit" in str(e).lower():
+                        st.error("⚠️ Rate limit reached! Please wait and try again later.")
+                        st.info("💡 Your daily token limit has been exceeded. Try again in about 30 minutes, or reduce the number of questions.")
+                    else:
+                        st.error(f"Error generating Q&A: {str(e)}")
+        
+        # Display generated Q&A
+        if st.session_state.auto_qa:
+            st.markdown("### Generated Questions & Answers:")
+            for i, qa in enumerate(st.session_state.auto_qa, 1):
+                with st.expander(f"❓ {qa['question']}", expanded=(i==1)):
+                    st.markdown(f"**Answer:** {qa['answer']}")
+                    st.caption(f"Source: AI-generated based on video content")
     
     # Chat interface
     if st.session_state.rag_chain:
